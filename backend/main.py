@@ -48,7 +48,7 @@ def extract_pdf_text(file_bytes: bytes) -> str:
         return "\n".join(page.extract_text() or "" for page in pdf.pages)
 
 def gemini_flash():
-    return genai.GenerativeModel("gemini-2.5-flash")
+    return genai.GenerativeModel("gemini-1.5-flash")
 
 def call_gemini(prompt: str) -> str:
     model = gemini_flash()
@@ -297,7 +297,7 @@ Rules:
 
 Start with your Tier 1 question now. Do not introduce yourself. Just ask the question."""
 
-    model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system_prompt)
+    model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system_prompt)
     chat = model.start_chat()
     response = chat.send_message(f"Begin the {skill} assessment.")
 
