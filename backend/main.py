@@ -50,10 +50,30 @@ def extract_pdf_text(file_bytes: bytes) -> str:
 def gemini_flash():
     return genai.GenerativeModel("gemini-2.5-flash")
 
-def call_gemini(prompt: str) -> str:
+def call_gemini(prompt: str):
     model = gemini_flash()
-    response = model.generate_content(prompt)
-    return response.text
+
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+
+    except Exception as e:
+        error_msg = str(e).lower()
+
+        # Quota exceeded (your current issue)
+        if "quota" in error_msg or "resourceexhausted" in error_msg:
+            return {"error": "API limit reached. Please try again later."}
+
+        # Invalid API key
+        elif "api key" in error_msg or "permission" in error_msg:
+            return {"error": "Invalid API key. Please check configuration."}
+
+        # Rate limit (temporary)
+        elif "rate" in error_msg:
+            return {"error": "Too many requests. Please wait and try again."}
+
+        # Fallback
+        return {"error": "Something went wrong. Please try again."}
 
 def parse_json_from_llm(text: str) -> dict:
     """Strip markdown fences and parse JSON."""
@@ -169,7 +189,14 @@ Return ONLY valid JSON (no markdown fences) in this exact format:
 
 Extract up to 15 most relevant skills. Be conservative with levels — most people claiming 'expert' are 'advanced' at best."""
 
-    resume_data = parse_json_from_llm(call_gemini(resume_prompt))
+    
+    result = call_gemini(resume_prompt)
+
+    # Handle error response
+    if isinstance(result, dict) and "error" in result:
+        return result
+
+    resume_data = parse_json_from_llm(result)
 
     # Step 2: Parse JD
     jd_prompt = f"""Extract required skills from this job description as structured JSON.
