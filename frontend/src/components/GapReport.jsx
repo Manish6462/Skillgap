@@ -1,107 +1,86 @@
 import React from 'react';
 
-const SEVERITY_COLOR = {
-  critical: { bg: '#fff0ee', text: '#7a2510', dot: '#d85a30' },
-  moderate:  { bg: '#faf3e0', text: '#5c3d0a', dot: '#ba7517' },
-  minor:     { bg: '#e8f5fe', text: '#0c3e6e', dot: '#378add' },
-  none:      { bg: '#eaf3de', text: '#1e4a08', dot: '#639922' },
+const SEVERITY = {
+  critical: { dot: '#E5533A', label: 'critical' },
+  moderate: { dot: '#D4900A', label: 'moderate' },
+  minor:    { dot: '#4A90D9', label: 'minor' },
+  none:     { dot: '#4CAF82', label: 'none' },
 };
+const LEVEL_W = { none:0, beginner:18, intermediate:44, advanced:70, expert:94 };
 
-const LEVEL_WIDTH = { none: 0, beginner: 20, intermediate: 45, advanced: 70, expert: 95 };
-
-export default function GapReport({ gaps, assessments, skillsToAssess, onStartAssessment, activeSkill }) {
+export default function GapReport({ gaps, assessments, skillsToAssess, onStartAssessment, activeSkill, t }) {
   if (!gaps || gaps.length === 0) return null;
 
-  return (
-    <div style={{ fontSize: 13 }}>
-      <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 12, color: '#1a1a1a' }}>
-        Skill gap report
-      </div>
+  const getBg = (severity) => {
+    if (severity === 'critical') return t.redLight;
+    if (severity === 'moderate') return t.amberLight;
+    if (severity === 'none') return t.greenLight;
+    return t.bgSecondary;
+  };
+  const getTextColor = (severity) => {
+    if (severity === 'critical') return t.red;
+    if (severity === 'moderate') return t.amber;
+    if (severity === 'none') return t.green;
+    return t.textSecondary;
+  };
 
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       {gaps.map((gap) => {
-        const colors = SEVERITY_COLOR[gap.severity] || SEVERITY_COLOR.minor;
+        const sv = SEVERITY[gap.severity] || SEVERITY.minor;
         const assessed = assessments?.[gap.skill];
         const isActive = activeSkill === gap.skill;
         const canAssess = skillsToAssess?.includes(gap.skill) && !assessed && gap.severity !== 'none';
 
         return (
-          <div
-            key={gap.skill}
-            style={{
-              marginBottom: 8,
-              padding: '10px 12px',
-              borderRadius: 8,
-              border: isActive ? '1.5px solid #534AB7' : '0.5px solid #e0ddd8',
-              background: isActive ? '#f5f4ff' : '#fff',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: colors.dot, flexShrink: 0, display: 'inline-block'
-                }} />
-                <span style={{ fontWeight: 500, color: '#1a1a1a' }}>{gap.skill}</span>
+          <div key={gap.skill} style={{
+            padding: '12px 14px', borderRadius: 10,
+            border: `1px solid ${isActive ? t.purple : t.border}`,
+            background: isActive ? t.purpleLight : t.bgCard,
+            transition: 'border-color 0.15s, background 0.15s',
+            boxShadow: t.shadow,
+          }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+                <span style={{ width:7, height:7, borderRadius:'50%', background:sv.dot, display:'inline-block', flexShrink:0 }} />
+                <span style={{ fontWeight:600, fontSize:13, color:t.text }}>{gap.skill}</span>
                 {gap.priority === 'must-have' && (
-                  <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: '#f5f4ff', color: '#534AB7' }}>
-                    must-have
-                  </span>
+                  <span style={{ fontSize:10, padding:'1px 6px', borderRadius:4, background:t.purpleLight, color:t.purpleText, fontWeight:600 }}>MUST-HAVE</span>
                 )}
               </div>
-              <span style={{
-                fontSize: 11, padding: '2px 7px', borderRadius: 4,
-                background: colors.bg, color: colors.text, fontWeight: 500
-              }}>
-                {gap.severity}
+              <span style={{ fontSize:11, padding:'2px 8px', borderRadius:5, background:getBg(gap.severity), color:getTextColor(gap.severity), fontWeight:600, letterSpacing:'0.02em' }}>
+                {sv.label}
               </span>
             </div>
 
             {/* Level bar */}
-            <div style={{ marginBottom: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888', marginBottom: 3 }}>
-                <span>candidate: {assessed ? assessed.verified_level : gap.candidate_level}</span>
-                <span>required: {gap.required_level}</span>
+            <div style={{ marginBottom: canAssess || assessed ? 8 : 0 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:t.textTertiary, marginBottom:4 }}>
+                <span>candidate: <strong style={{ color:t.textSecondary }}>{assessed ? assessed.verified_level : gap.candidate_level}</strong></span>
+                <span>required: <strong style={{ color:t.textSecondary }}>{gap.required_level}</strong></span>
               </div>
-              <div style={{ height: 4, borderRadius: 2, background: '#f0ede8', position: 'relative' }}>
-                {/* Required level marker */}
-                <div style={{
-                  position: 'absolute',
-                  left: `${LEVEL_WIDTH[gap.required_level] || 50}%`,
-                  top: -2, width: 2, height: 8, background: '#d85a30', borderRadius: 1
-                }} />
-                {/* Candidate level bar */}
-                <div style={{
-                  height: '100%', borderRadius: 2,
-                  background: assessed ? '#534AB7' : '#b4b2a9',
-                  width: `${LEVEL_WIDTH[assessed ? assessed.verified_level : gap.candidate_level] || 0}%`,
-                  transition: 'width 0.4s ease',
-                }} />
+              <div style={{ height:5, borderRadius:3, background:t.bgTertiary, position:'relative', overflow:'visible' }}>
+                <div style={{ position:'absolute', left:`${LEVEL_W[gap.required_level]||50}%`, top:-2, width:2, height:9, background:t.red, borderRadius:1 }} />
+                <div style={{ height:'100%', borderRadius:3, background:assessed?t.purple:t.textTertiary, width:`${LEVEL_W[assessed?assessed.verified_level:gap.candidate_level]||0}%`, transition:'width 0.5s ease' }} />
               </div>
             </div>
 
             {assessed && (
-              <div style={{ fontSize: 11, color: '#555', marginBottom: 4, fontStyle: 'italic' }}>
+              <div style={{ fontSize:11, color:t.textSecondary, fontStyle:'italic', marginBottom:6, lineHeight:1.5 }}>
                 "{assessed.summary}"
               </div>
             )}
 
             {canAssess && (
-              <button
-                onClick={() => onStartAssessment(gap.skill)}
-                style={{
-                  marginTop: 4, fontSize: 11, padding: '3px 10px',
-                  borderRadius: 5, border: '0.5px solid #534AB7',
-                  background: 'transparent', color: '#534AB7', cursor: 'pointer'
-                }}
+              <button onClick={() => onStartAssessment(gap.skill)} style={{ fontSize:11, padding:'4px 11px', borderRadius:6, border:`1px solid ${t.purple}`, background:'transparent', color:t.purple, fontWeight:600, transition:'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.background=t.purpleLight; }}
+                onMouseLeave={e => { e.currentTarget.style.background='transparent'; }}
               >
-                Assess this skill ↗
+                Assess ↗
               </button>
             )}
-
             {assessed && (
-              <div style={{ marginTop: 4, fontSize: 11, color: '#639922' }}>
-                ✓ Assessed — score {assessed.score}/5
-              </div>
+              <div style={{ fontSize:11, color:t.green, fontWeight:500 }}>✓ Score: {assessed.score}/5</div>
             )}
           </div>
         );
