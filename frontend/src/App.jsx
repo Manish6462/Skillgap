@@ -166,12 +166,10 @@ export default function App() {
                 ← Start over
               </button>
             )}
-            <button onClick={() => setIsDark(!isDark)} title={isDark ? 'Light mode' : 'Dark mode'}
-            />
             {aiMode === 'demo' && (
               <div style={{ fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:6, background:'#FEF3C7', color:'#B45309', border:'1px solid #F59E0B40', letterSpacing:'0.04em' }}>DEMO MODE</div>
             )}
-            <button style={{display:'none'}} style={{ width:36, height:36, borderRadius:8, border:`1px solid ${t.border}`, background:t.bgSecondary, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, transition:'all 0.15s' }}>
+            <button onClick={() => setIsDark(!isDark)} title={isDark ? 'Light mode' : 'Dark mode'} style={{ width:36, height:36, borderRadius:8, border:`1px solid ${t.border}`, background:t.bgSecondary, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, transition:'all 0.15s' }}>
               {isDark ? '☀️' : '🌙'}
             </button>
           </div>
