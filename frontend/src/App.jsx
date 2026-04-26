@@ -4,6 +4,7 @@ import GapReport from './components/GapReport';
 import LearningPlan from './components/LearningPlan';
 import VoiceInterview from './components/VoiceInterview';
 import { lightTheme, darkTheme, fonts } from './theme';
+import ErrorState, { ErrorBanner, classifyError } from './components/ErrorState';
 
 export const ThemeContext = createContext(lightTheme);
 export const useTheme = () => useContext(ThemeContext);
@@ -42,11 +43,7 @@ function Chip({ t, color, children }) {
   );
 }
 
-function ErrorBanner({ t, children }) {
-  return (
-    <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 12, background: t.redLight, border: `1px solid ${t.red}30`, fontSize: 13, color: t.red }}>{children}</div>
-  );
-}
+// ErrorBanner imported from ErrorState component
 
 export default function App() {
   const [isDark, setIsDark] = useState(false);
@@ -65,9 +62,13 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [interviewMode, setInterviewMode] = useState('text');
+  const [aiMode, setAiMode] = useState('live'); // 'live' | 'demo'
   const chatBottomRef = useRef(null);
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    fetch('/api/health').then(r=>r.json()).then(d=>{ if(d.mode==='demo') setAiMode('demo'); }).catch(()=>{});
+  }, []);
   useEffect(() => {
     document.body.style.background = t.bg;
     document.body.style.color = t.text;
@@ -88,7 +89,7 @@ export default function App() {
     if (!jdText.trim() || !resumeText.trim()) { setError('Please provide both a job description and resume.'); return; }
     setError(''); setStep('analyzing');
     try { const data = await api.analyze(jdText, resumeText); setSession(data); setStep('gaps'); }
-    catch { setError('Analysis failed — check your API key and try again.'); setStep('input'); }
+    catch (e) { const msg = e?.response?.data?.detail || e?.message || ''; setError(msg); setAiMode('demo'); setStep('input'); }
   };
 
   const handleStartAssessment = async (skill) => {
@@ -120,7 +121,7 @@ export default function App() {
   const handleGeneratePlan = async () => {
     setLoading(true);
     try { const plan = await api.generatePlan(session.session_id); setLearningPlan(plan); setStep('plan'); }
-    catch { setError('Plan generation failed — try again.'); }
+    catch (e) { const msg = e?.response?.data?.detail || e?.message || 'Plan generation failed'; setError(msg); }
     setLoading(false);
   };
 
@@ -165,7 +166,12 @@ export default function App() {
                 ← Start over
               </button>
             )}
-            <button onClick={() => setIsDark(!isDark)} title={isDark ? 'Light mode' : 'Dark mode'} style={{ width:36, height:36, borderRadius:8, border:`1px solid ${t.border}`, background:t.bgSecondary, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, transition:'all 0.15s' }}>
+            <button onClick={() => setIsDark(!isDark)} title={isDark ? 'Light mode' : 'Dark mode'}
+            />
+            {aiMode === 'demo' && (
+              <div style={{ fontSize:11, fontWeight:600, padding:'3px 9px', borderRadius:6, background:'#FEF3C7', color:'#B45309', border:'1px solid #F59E0B40', letterSpacing:'0.04em' }}>DEMO MODE</div>
+            )}
+            <button style={{display:'none'}} style={{ width:36, height:36, borderRadius:8, border:`1px solid ${t.border}`, background:t.bgSecondary, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, transition:'all 0.15s' }}>
               {isDark ? '☀️' : '🌙'}
             </button>
           </div>
@@ -208,7 +214,7 @@ export default function App() {
                     <textarea value={resumeText} onChange={e => setResumeText(e.target.value)} placeholder="Paste resume text here..." style={textareaStyle(t, 188)} />
                   </InputCard>
 
-                  {error && <ErrorBanner t={t}>{error}</ErrorBanner>}
+                  {error && <ErrorState message={error} onRetry={() => setError("")} onDismiss={() => setError("")} t={t} />}
 
                   <button onClick={handleAnalyze} disabled={loading || !jdText.trim() || !resumeText.trim()} style={{ padding:'13px 28px', borderRadius:10, fontSize:15, fontWeight:600, background:t.text, color:t.accentText, border:'none', opacity:loading||!jdText.trim()||!resumeText.trim()?0.4:1, transition:'all 0.15s', display:'inline-flex', alignItems:'center', gap:8, alignSelf:'flex-start', letterSpacing:'-0.01em', boxShadow:t.shadow }}>
                     Analyze skills
@@ -246,7 +252,7 @@ export default function App() {
                     <Chip t={t} color="red">{session.gaps?.filter(g=>g.severity==='critical').length} critical gaps</Chip>
                   </div>
                 </div>
-                {error && <ErrorBanner t={t}>{error}</ErrorBanner>}
+                {error && <ErrorState message={error} onRetry={() => setError("")} onDismiss={() => setError("")} t={t} />}
                 {session.skills_to_assess?.length > 0 ? (
                   <div style={{ padding:'12px 16px', borderRadius:10, marginBottom:18, background:t.purpleLight, border:`1px solid ${t.purple}30`, fontSize:13, color:t.purpleText }}>
                     Click <strong>"Assess this skill"</strong> on any gap below, then generate your personalized learning plan.
@@ -307,7 +313,7 @@ export default function App() {
                       )}
                       <div ref={chatBottomRef} />
                     </div>
-                    {error && <ErrorBanner t={t}>{error}</ErrorBanner>}
+                    {error && <ErrorState message={error} onRetry={() => setError("")} onDismiss={() => setError("")} t={t} />}
                     <div style={{ display:'flex', gap:10 }}>
                       <input value={userInput} onChange={e => setUserInput(e.target.value)} onKeyDown={e => e.key==='Enter'&&!e.shiftKey&&handleSend()} placeholder="Type your answer..." disabled={loading||assessmentDone}
                         style={{ flex:1, padding:'12px 16px', fontSize:14, borderRadius:10, border:`1px solid ${t.border}`, outline:'none', background:t.bgInput, color:t.text, transition:'border-color 0.15s, box-shadow 0.15s' }}
