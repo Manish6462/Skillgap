@@ -215,7 +215,13 @@ Return ONLY valid JSON (no markdown fences) in this exact format:
 
 Focus on technical/measurable skills. Infer required levels from context (e.g. '5+ years' = advanced/expert)."""
 
-    jd_data = parse_json_from_llm(call_gemini(jd_prompt))
+    result = call_gemini(jd_prompt)
+
+# Handle error properly
+    if isinstance(result, dict) and "error" in result:
+        return result  # or raise HTTPException
+
+    jd_data = parse_json_from_llm(result)
 
     # Step 3: Gap analysis (pure logic, no LLM)
     level_map = {"beginner": 1, "intermediate": 2, "advanced": 3, "expert": 4}
