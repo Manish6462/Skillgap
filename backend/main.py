@@ -115,8 +115,13 @@ def call_llm_chat(messages: list) -> str:
             system_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
             history = [m for m in messages if m["role"] != "system"]
             model = gemini_client.GenerativeModel("gemini-2.0-flash", system_instruction=system_msg)
-            chat = model.start_chat()
-            last_user = next((m["content"] for m in reversed(history) if m["role"] == "user"), "hello")
+            # Pass full conversation history so Gemini retains context across turns
+            gemini_history = [
+                {"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]}
+                for m in history[:-1]
+            ]
+            chat = model.start_chat(history=gemini_history)
+            last_user = history[-1]["content"] if history and history[-1]["role"] == "user" else "Continue."
             response = chat.send_message(last_user)
             return response.text
         except Exception as e:
@@ -142,7 +147,7 @@ def _mock_response(prompt: str) -> str:
     """Return realistic mock JSON based on what the prompt is asking for."""
     p = prompt.lower()
 
-    if "extract skills from this resume" in p or '"name":' in p and "years_experience" in p:
+    if "extract skills from this resume" in p or ('"name":' in p and "years_experience" in p):
         return json.dumps({
             "name": "Demo Candidate",
             "years_experience": 2,
@@ -175,7 +180,7 @@ def _mock_response(prompt: str) -> str:
             ]
         })
 
-    if "verified_level" in p or "score" in p and "strengths" in p:
+    if "verified_level" in p or ("score" in p and "strengths" in p):
         return json.dumps({
             "skill": "React",
             "verified_level": "intermediate",
@@ -236,8 +241,8 @@ def _mock_response(prompt: str) -> str:
 
 _mock_questions = [
     "Can you explain what a React hook is and give an example of when you'd use useEffect?",
-    "Walk me through how you would optimize a React component that's re-rendering too frequently.",
-    "What happens when you call setState inside a useEffect with no dependency array? ASSESSMENT_COMPLETE\n\nThank you for completing the assessment."
+    "Walk me through how you would optimize a React component that is re-rendering too frequently.",
+    "What happens when you call setState inside a useEffect with no dependency array?",
 ]
 
 def _mock_chat_response(messages: list) -> str:
