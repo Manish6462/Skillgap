@@ -41,4 +41,10 @@ export const api = {
     });
     return res.data;
   },
+
+  // YouTube — key stays server-side, never exposed to frontend
+  fetchYouTubeVideos: async (skill, level = 'beginner') => {
+    const res = await axios.post(`${BASE}/api/youtube`, { skill, level });
+    return res.data.videos;
+  },
 };
