@@ -11,7 +11,7 @@ const EyeIcon = ({ show }) => (
 );
 
 export default function LoginPage({ t }) {
-  const [tab, setTab]           = useState('signin');   // 'signin' | 'signup' | 'forgot'
+  const [tab, setTab]           = useState('signin');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
@@ -20,6 +20,7 @@ export default function LoginPage({ t }) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [success, setSuccess]   = useState('');
+  const [focusedField, setFocusedField] = useState('');
 
   const clearState = (nextTab) => {
     setEmail(''); setPassword(''); setConfirm('');
@@ -53,8 +54,8 @@ export default function LoginPage({ t }) {
     if (password.length < 6)            { setError('Password must be at least 6 characters.'); return; }
     setLoading(true); setError('');
     const { error: err } = await supabase.auth.signUp({ email, password });
-    if (err) { setError(friendlyError(err.message)); }
-    else     { setSuccess('Account created! You are now signed in.'); }
+    if (err) setError(friendlyError(err.message));
+    else     setSuccess('Account created! You are now signed in.');
     setLoading(false);
   };
 
@@ -70,15 +71,18 @@ export default function LoginPage({ t }) {
     setLoading(false);
   };
 
-  // ── Styles ─────────────────────────────────────────────────────────────────
-  const inputStyle = (focused) => ({
+  const inputStyle = (id) => ({
     width: '100%', padding: '11px 14px', fontSize: 14, borderRadius: 9,
-    border: `1.5px solid ${focused ? t.purple : t.border}`,
+    border: `1.5px solid ${focusedField === id ? t.purple : t.border}`,
     background: t.bgInput, color: t.text,
     outline: 'none', fontFamily: 'inherit',
-    boxShadow: focused ? `0 0 0 3px ${t.purple}18` : 'none',
+    boxShadow: focusedField === id ? `0 0 0 3px ${t.purple}18` : 'none',
     transition: 'border-color 0.15s, box-shadow 0.15s',
     boxSizing: 'border-box',
+  });
+
+  const pwInputStyle = (id) => ({
+    ...inputStyle(id), paddingRight: 42,
   });
 
   const btnStyle = (disabled) => ({
@@ -90,53 +94,30 @@ export default function LoginPage({ t }) {
     transition: 'all 0.15s', letterSpacing: '-0.01em',
   });
 
-  const PasswordField = ({ value, onChange, show, onToggle, placeholder, id }) => {
-    const [focused, setFocused] = useState(false);
-    return (
-      <div style={{ position: 'relative' }}>
-        <input
-          id={id} type={show ? 'text' : 'password'}
-          value={value} onChange={onChange} placeholder={placeholder}
-          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          style={{ ...inputStyle(focused), paddingRight: 42 }}
-          autoComplete={id === 'password' ? 'current-password' : 'new-password'}
-        />
-        <button type="button" onClick={onToggle} style={{
-          position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: t.textTertiary, display: 'flex', alignItems: 'center', padding: 2,
-        }}>
-          <EyeIcon show={show} />
-        </button>
-      </div>
-    );
-  };
+  const Spinner = () => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${t.textTertiary}`, borderTopColor: t.accentText, animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+      {tab === 'signin' ? 'Signing in...' : tab === 'signup' ? 'Creating account...' : 'Sending...'}
+    </span>
+  );
 
-  const EmailField = () => {
-    const [focused, setFocused] = useState(false);
-    return (
-      <input
-        type="email" value={email} onChange={e => setEmail(e.target.value)}
-        placeholder="you@example.com" autoComplete="email"
-        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        style={inputStyle(focused)}
-      />
-    );
-  };
+  const ErrorBox = () => error
+    ? <div style={{ fontSize: 12, color: t.red, padding: '8px 12px', borderRadius: 8, background: t.redLight, border: `1px solid ${t.red}30` }}>{error}</div>
+    : null;
+
+  const SuccessBox = () => success
+    ? <div style={{ fontSize: 12, color: t.green, padding: '8px 12px', borderRadius: 8, background: t.greenLight, border: `1px solid ${t.green}30` }}>{success}</div>
+    : null;
 
   return (
-    <div style={{
-      minHeight: '100vh', background: t.bg,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'DM Sans', sans-serif", padding: '24px 16px',
-    }}>
+    <div style={{ minHeight: '100vh', background: t.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif", padding: '24px 16px' }}>
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
         @keyframes spin   { to{transform:rotate(360deg)} }
-        .fade-up { animation: fadeUp 0.4s ease both; }
+        .auth-fade { animation: fadeUp 0.4s ease both; }
       `}</style>
 
-      <div className="fade-up" style={{ width: '100%', maxWidth: 400 }}>
+      <div className="auth-fade" style={{ width: '100%', maxWidth: 400 }}>
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32, justifyContent: 'center' }}>
@@ -153,19 +134,17 @@ export default function LoginPage({ t }) {
         {/* Card */}
         <div style={{ background: t.bgCard, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow, overflow: 'hidden' }}>
 
-          {/* Tab bar — only show on signin/signup */}
+          {/* Tabs */}
           {tab !== 'forgot' && (
             <div style={{ display: 'flex', borderBottom: `1px solid ${t.border}` }}>
               {[['signin', 'Sign in'], ['signup', 'Create account']].map(([key, label]) => (
-                <button key={key} onClick={() => clearState(key)} style={{
+                <button key={key} type="button" onClick={() => clearState(key)} style={{
                   flex: 1, padding: '14px 0', fontSize: 13, fontWeight: 600,
                   background: 'none', border: 'none', cursor: 'pointer',
                   color: tab === key ? t.text : t.textTertiary,
                   borderBottom: `2px solid ${tab === key ? t.purple : 'transparent'}`,
-                  transition: 'all 0.15s', letterSpacing: '-0.01em',
-                }}>
-                  {label}
-                </button>
+                  transition: 'all 0.15s',
+                }}>{label}</button>
               ))}
             </div>
           )}
@@ -177,29 +156,38 @@ export default function LoginPage({ t }) {
               <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Email</label>
-                  <EmailField />
+                  <input
+                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email"
+                    onFocus={() => setFocusedField('email-si')}
+                    onBlur={() => setFocusedField('')}
+                    style={inputStyle('email-si')}
+                  />
                 </div>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary }}>Password</label>
                     <button type="button" onClick={() => clearState('forgot')} style={{ fontSize: 12, color: t.purple, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       Forgot password?
                     </button>
                   </div>
-                  <PasswordField id="password" value={password} onChange={e => setPassword(e.target.value)} show={showPw} onToggle={() => setShowPw(v => !v)} placeholder="Your password" />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPw ? 'text' : 'password'} value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="Your password" autoComplete="current-password"
+                      onFocus={() => setFocusedField('pw-si')}
+                      onBlur={() => setFocusedField('')}
+                      style={pwInputStyle('pw-si')}
+                    />
+                    <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: t.textTertiary, display: 'flex', alignItems: 'center', padding: 2 }}>
+                      <EyeIcon show={showPw} />
+                    </button>
+                  </div>
                 </div>
-
-                {error   && <div style={{ fontSize: 12, color: t.red, padding: '8px 12px', borderRadius: 8, background: t.redLight, border: `1px solid ${t.red}30` }}>{error}</div>}
-                {success && <div style={{ fontSize: 12, color: t.green, padding: '8px 12px', borderRadius: 8, background: t.greenLight, border: `1px solid ${t.green}30` }}>{success}</div>}
-
+                <ErrorBox /><SuccessBox />
                 <button type="submit" disabled={loading} style={btnStyle(loading)}>
-                  {loading
-                    ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${t.textTertiary}`, borderTopColor: t.accentText, animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
-                        Signing in...
-                      </span>
-                    : 'Sign in'
-                  }
+                  {loading ? <Spinner /> : 'Sign in'}
                 </button>
               </form>
             )}
@@ -209,18 +197,47 @@ export default function LoginPage({ t }) {
               <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Email</label>
-                  <EmailField />
+                  <input
+                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email"
+                    onFocus={() => setFocusedField('email-su')}
+                    onBlur={() => setFocusedField('')}
+                    style={inputStyle('email-su')}
+                  />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Password</label>
-                  <PasswordField id="new-password" value={password} onChange={e => setPassword(e.target.value)} show={showPw} onToggle={() => setShowPw(v => !v)} placeholder="At least 6 characters" />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPw ? 'text' : 'password'} value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="At least 6 characters" autoComplete="new-password"
+                      onFocus={() => setFocusedField('pw-su')}
+                      onBlur={() => setFocusedField('')}
+                      style={pwInputStyle('pw-su')}
+                    />
+                    <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: t.textTertiary, display: 'flex', alignItems: 'center', padding: 2 }}>
+                      <EyeIcon show={showPw} />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Confirm password</label>
-                  <PasswordField id="confirm-password" value={confirm} onChange={e => setConfirm(e.target.value)} show={showCf} onToggle={() => setShowCf(v => !v)} placeholder="Repeat your password" />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showCf ? 'text' : 'password'} value={confirm}
+                      onChange={e => setConfirm(e.target.value)}
+                      placeholder="Repeat your password" autoComplete="new-password"
+                      onFocus={() => setFocusedField('cf-su')}
+                      onBlur={() => setFocusedField('')}
+                      style={pwInputStyle('cf-su')}
+                    />
+                    <button type="button" onClick={() => setShowCf(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: t.textTertiary, display: 'flex', alignItems: 'center', padding: 2 }}>
+                      <EyeIcon show={showCf} />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Password strength hint */}
                 {password.length > 0 && (
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     {[1, 2, 3].map(i => (
@@ -238,19 +255,10 @@ export default function LoginPage({ t }) {
                   </div>
                 )}
 
-                {error   && <div style={{ fontSize: 12, color: t.red, padding: '8px 12px', borderRadius: 8, background: t.redLight, border: `1px solid ${t.red}30` }}>{error}</div>}
-                {success && <div style={{ fontSize: 12, color: t.green, padding: '8px 12px', borderRadius: 8, background: t.greenLight, border: `1px solid ${t.green}30` }}>{success}</div>}
-
+                <ErrorBox /><SuccessBox />
                 <button type="submit" disabled={loading} style={btnStyle(loading)}>
-                  {loading
-                    ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${t.textTertiary}`, borderTopColor: t.accentText, animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
-                        Creating account...
-                      </span>
-                    : 'Create account'
-                  }
+                  {loading ? <Spinner /> : 'Create account'}
                 </button>
-
                 <p style={{ fontSize: 11, color: t.textTertiary, textAlign: 'center', margin: 0 }}>
                   By creating an account you agree to our terms of service.
                 </p>
@@ -263,31 +271,24 @@ export default function LoginPage({ t }) {
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 18, color: t.text, marginBottom: 6 }}>Reset your password</div>
                   <div style={{ fontSize: 13, color: t.textSecondary, lineHeight: 1.55 }}>
-                    Enter your email and we'll send you a link to reset your password.
+                    Enter your email and we'll send you a reset link.
                   </div>
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Email</label>
-                  <EmailField />
+                  <input
+                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email"
+                    onFocus={() => setFocusedField('email-fp')}
+                    onBlur={() => setFocusedField('')}
+                    style={inputStyle('email-fp')}
+                  />
                 </div>
-
-                {error   && <div style={{ fontSize: 12, color: t.red, padding: '8px 12px', borderRadius: 8, background: t.redLight, border: `1px solid ${t.red}30` }}>{error}</div>}
-                {success && <div style={{ fontSize: 12, color: t.green, padding: '8px 12px', borderRadius: 8, background: t.greenLight, border: `1px solid ${t.green}30` }}>{success}</div>}
-
+                <ErrorBox /><SuccessBox />
                 <button type="submit" disabled={loading} style={btnStyle(loading)}>
-                  {loading
-                    ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${t.textTertiary}`, borderTopColor: t.accentText, animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
-                        Sending...
-                      </span>
-                    : 'Send reset link'
-                  }
+                  {loading ? <Spinner /> : 'Send reset link'}
                 </button>
-
-                <button type="button" onClick={() => clearState('signin')} style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 13, color: t.textSecondary, padding: '4px 0',
-                }}>
+                <button type="button" onClick={() => clearState('signin')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: t.textSecondary, padding: '4px 0' }}>
                   ← Back to sign in
                 </button>
               </form>
@@ -295,12 +296,9 @@ export default function LoginPage({ t }) {
           </div>
         </div>
 
-        {/* Features strip */}
         <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'center', flexWrap: 'wrap' }}>
           {['🔒 Private & secure', '🔍 Skill gap analysis', '📚 Learning plans'].map(f => (
-            <div key={f} style={{ fontSize: 12, color: t.textSecondary, padding: '5px 12px', borderRadius: 20, border: `1px solid ${t.border}`, background: t.bgCard }}>
-              {f}
-            </div>
+            <div key={f} style={{ fontSize: 12, color: t.textSecondary, padding: '5px 12px', borderRadius: 20, border: `1px solid ${t.border}`, background: t.bgCard }}>{f}</div>
           ))}
         </div>
       </div>
