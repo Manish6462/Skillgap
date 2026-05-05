@@ -24,10 +24,10 @@ export default function ProfilePage({ t, onClose, onLoadSession }) {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const avatar = user?.user_metadata?.avatar_url;
-  const name   = user?.user_metadata?.full_name || user?.user_metadata?.user_name || 'User';
+  const avatar = user?.user_metadata?.avatar_url || null;
+  const name   = user?.user_metadata?.full_name || user?.user_metadata?.user_name || user?.email?.split('@')[0] || 'User';
   const email  = user?.email;
-  const github = user?.user_metadata?.user_name;
+  const github = user?.user_metadata?.user_name || null;
 
   const totalAssessments = sessions.reduce((acc, s) => acc + Object.keys(s.assessments || {}).length, 0);
   const avgScore = sessions.length
@@ -78,6 +78,7 @@ export default function ProfilePage({ t, onClose, onLoadSession }) {
                   @{github}
                 </a>
               )}
+              {!github && <div style={{ fontSize: 12, color: t.textTertiary }}>Email account</div>}
             </div>
           </div>
 

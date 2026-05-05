@@ -1,86 +1,306 @@
-import React from 'react';
-import { useAuth } from '../AuthContext';
+import React, { useState } from 'react';
+import { supabase } from '../supabase';
+
+const EyeIcon = ({ show }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {show
+      ? <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>
+      : <><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></>
+    }
+  </svg>
+);
 
 export default function LoginPage({ t }) {
-  const { signInWithGitHub } = useAuth();
+  const [tab, setTab]           = useState('signin');   // 'signin' | 'signup' | 'forgot'
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm]   = useState('');
+  const [showPw, setShowPw]     = useState(false);
+  const [showCf, setShowCf]     = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [success, setSuccess]   = useState('');
+
+  const clearState = (nextTab) => {
+    setEmail(''); setPassword(''); setConfirm('');
+    setError(''); setSuccess(''); setShowPw(false); setShowCf(false);
+    setTab(nextTab);
+  };
+
+  const friendlyError = (msg = '') => {
+    if (msg.includes('Invalid login'))        return 'Incorrect email or password.';
+    if (msg.includes('Email not confirmed'))  return 'Please verify your email before signing in.';
+    if (msg.includes('already registered'))   return 'An account with this email already exists.';
+    if (msg.includes('Password should'))      return 'Password must be at least 6 characters.';
+    if (msg.includes('Unable to validate'))   return 'Please enter a valid email address.';
+    if (msg.includes('rate limit'))           return 'Too many attempts. Please wait a moment.';
+    return msg || 'Something went wrong. Please try again.';
+  };
+
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    if (!email || !password) { setError('Please fill in all fields.'); return; }
+    setLoading(true); setError('');
+    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+    if (err) setError(friendlyError(err.message));
+    setLoading(false);
+  };
+
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    if (!email || !password || !confirm) { setError('Please fill in all fields.'); return; }
+    if (password !== confirm)            { setError('Passwords do not match.'); return; }
+    if (password.length < 6)            { setError('Password must be at least 6 characters.'); return; }
+    setLoading(true); setError('');
+    const { error: err } = await supabase.auth.signUp({ email, password });
+    if (err) { setError(friendlyError(err.message)); }
+    else     { setSuccess('Account created! You are now signed in.'); }
+    setLoading(false);
+  };
+
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    if (!email) { setError('Please enter your email address.'); return; }
+    setLoading(true); setError('');
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (err) setError(friendlyError(err.message));
+    else     setSuccess('Password reset email sent! Check your inbox.');
+    setLoading(false);
+  };
+
+  // ── Styles ─────────────────────────────────────────────────────────────────
+  const inputStyle = (focused) => ({
+    width: '100%', padding: '11px 14px', fontSize: 14, borderRadius: 9,
+    border: `1.5px solid ${focused ? t.purple : t.border}`,
+    background: t.bgInput, color: t.text,
+    outline: 'none', fontFamily: 'inherit',
+    boxShadow: focused ? `0 0 0 3px ${t.purple}18` : 'none',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    boxSizing: 'border-box',
+  });
+
+  const btnStyle = (disabled) => ({
+    width: '100%', padding: '12px', borderRadius: 9,
+    fontSize: 14, fontWeight: 600,
+    background: disabled ? t.bgTertiary : t.text,
+    color: disabled ? t.textTertiary : t.accentText,
+    border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+    transition: 'all 0.15s', letterSpacing: '-0.01em',
+  });
+
+  const PasswordField = ({ value, onChange, show, onToggle, placeholder, id }) => {
+    const [focused, setFocused] = useState(false);
+    return (
+      <div style={{ position: 'relative' }}>
+        <input
+          id={id} type={show ? 'text' : 'password'}
+          value={value} onChange={onChange} placeholder={placeholder}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          style={{ ...inputStyle(focused), paddingRight: 42 }}
+          autoComplete={id === 'password' ? 'current-password' : 'new-password'}
+        />
+        <button type="button" onClick={onToggle} style={{
+          position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: t.textTertiary, display: 'flex', alignItems: 'center', padding: 2,
+        }}>
+          <EyeIcon show={show} />
+        </button>
+      </div>
+    );
+  };
+
+  const EmailField = () => {
+    const [focused, setFocused] = useState(false);
+    return (
+      <input
+        type="email" value={email} onChange={e => setEmail(e.target.value)}
+        placeholder="you@example.com" autoComplete="email"
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={inputStyle(focused)}
+      />
+    );
+  };
 
   return (
     <div style={{
       minHeight: '100vh', background: t.bg,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'DM Sans', sans-serif",
+      fontFamily: "'DM Sans', sans-serif", padding: '24px 16px',
     }}>
       <style>{`
-        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-        .fade-up { animation: fadeUp 0.5s ease both; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes spin   { to{transform:rotate(360deg)} }
+        .fade-up { animation: fadeUp 0.4s ease both; }
       `}</style>
 
-      <div className="fade-up" style={{ maxWidth: 440, width: '100%', padding: '0 24px' }}>
+      <div className="fade-up" style={{ width: '100%', maxWidth: 400 }}>
 
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 40 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32, justifyContent: 'center' }}>
           <div style={{ width: 32, height: 32, borderRadius: 9, background: t.text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
               <path d="M2 10L5 4L8 8L10 6L13 10" stroke={t.accentText} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 18, color: t.text, letterSpacing: '-0.02em' }}>
+          <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: t.text, letterSpacing: '-0.02em' }}>
             SkillGap<span style={{ color: t.purple }}>AI</span>
           </span>
         </div>
 
         {/* Card */}
-        <div style={{
-          background: t.bgCard, borderRadius: 16,
-          border: `1px solid ${t.border}`,
-          padding: '36px 32px',
-          boxShadow: t.shadow,
-        }}>
-          <h1 style={{
-            fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800,
-            color: t.text, letterSpacing: '-0.03em', marginBottom: 8,
-          }}>
-            Welcome back
-          </h1>
-          <p style={{ fontSize: 14, color: t.textSecondary, lineHeight: 1.6, marginBottom: 28 }}>
-            Sign in to access your skill assessments, learning plans, and assessment history.
-          </p>
+        <div style={{ background: t.bgCard, borderRadius: 16, border: `1px solid ${t.border}`, boxShadow: t.shadow, overflow: 'hidden' }}>
 
-          {/* GitHub button */}
-          <button
-            onClick={signInWithGitHub}
-            style={{
-              width: '100%', padding: '12px 20px',
-              borderRadius: 10, fontSize: 15, fontWeight: 600,
-              background: t.isDark ? '#F0EDE8' : '#24292F',
-              color: t.isDark ? '#111010' : '#FFFFFF',
-              border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              transition: 'opacity 0.15s, transform 0.15s',
-              boxShadow: t.shadow,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.opacity = '0.92'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.opacity = '1'; }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-            </svg>
-            Continue with GitHub
-          </button>
+          {/* Tab bar — only show on signin/signup */}
+          {tab !== 'forgot' && (
+            <div style={{ display: 'flex', borderBottom: `1px solid ${t.border}` }}>
+              {[['signin', 'Sign in'], ['signup', 'Create account']].map(([key, label]) => (
+                <button key={key} onClick={() => clearState(key)} style={{
+                  flex: 1, padding: '14px 0', fontSize: 13, fontWeight: 600,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: tab === key ? t.text : t.textTertiary,
+                  borderBottom: `2px solid ${tab === key ? t.purple : 'transparent'}`,
+                  transition: 'all 0.15s', letterSpacing: '-0.01em',
+                }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
-          <p style={{ fontSize: 12, color: t.textTertiary, textAlign: 'center', marginTop: 20, lineHeight: 1.5 }}>
-            Free to use · No credit card required · Your data is private
-          </p>
+          <div style={{ padding: '24px 24px 20px' }}>
+
+            {/* SIGN IN */}
+            {tab === 'signin' && (
+              <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Email</label>
+                  <EmailField />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary }}>Password</label>
+                    <button type="button" onClick={() => clearState('forgot')} style={{ fontSize: 12, color: t.purple, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      Forgot password?
+                    </button>
+                  </div>
+                  <PasswordField id="password" value={password} onChange={e => setPassword(e.target.value)} show={showPw} onToggle={() => setShowPw(v => !v)} placeholder="Your password" />
+                </div>
+
+                {error   && <div style={{ fontSize: 12, color: t.red, padding: '8px 12px', borderRadius: 8, background: t.redLight, border: `1px solid ${t.red}30` }}>{error}</div>}
+                {success && <div style={{ fontSize: 12, color: t.green, padding: '8px 12px', borderRadius: 8, background: t.greenLight, border: `1px solid ${t.green}30` }}>{success}</div>}
+
+                <button type="submit" disabled={loading} style={btnStyle(loading)}>
+                  {loading
+                    ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${t.textTertiary}`, borderTopColor: t.accentText, animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                        Signing in...
+                      </span>
+                    : 'Sign in'
+                  }
+                </button>
+              </form>
+            )}
+
+            {/* SIGN UP */}
+            {tab === 'signup' && (
+              <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Email</label>
+                  <EmailField />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Password</label>
+                  <PasswordField id="new-password" value={password} onChange={e => setPassword(e.target.value)} show={showPw} onToggle={() => setShowPw(v => !v)} placeholder="At least 6 characters" />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Confirm password</label>
+                  <PasswordField id="confirm-password" value={confirm} onChange={e => setConfirm(e.target.value)} show={showCf} onToggle={() => setShowCf(v => !v)} placeholder="Repeat your password" />
+                </div>
+
+                {/* Password strength hint */}
+                {password.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    {[1, 2, 3].map(i => (
+                      <div key={i} style={{
+                        height: 3, flex: 1, borderRadius: 2,
+                        background: password.length >= i * 4
+                          ? (password.length >= 10 ? t.green : password.length >= 6 ? t.amber : t.red)
+                          : t.bgTertiary,
+                        transition: 'background 0.2s',
+                      }} />
+                    ))}
+                    <span style={{ fontSize: 11, color: t.textTertiary, marginLeft: 4 }}>
+                      {password.length < 6 ? 'Too short' : password.length < 10 ? 'Fair' : 'Strong'}
+                    </span>
+                  </div>
+                )}
+
+                {error   && <div style={{ fontSize: 12, color: t.red, padding: '8px 12px', borderRadius: 8, background: t.redLight, border: `1px solid ${t.red}30` }}>{error}</div>}
+                {success && <div style={{ fontSize: 12, color: t.green, padding: '8px 12px', borderRadius: 8, background: t.greenLight, border: `1px solid ${t.green}30` }}>{success}</div>}
+
+                <button type="submit" disabled={loading} style={btnStyle(loading)}>
+                  {loading
+                    ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${t.textTertiary}`, borderTopColor: t.accentText, animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                        Creating account...
+                      </span>
+                    : 'Create account'
+                  }
+                </button>
+
+                <p style={{ fontSize: 11, color: t.textTertiary, textAlign: 'center', margin: 0 }}>
+                  By creating an account you agree to our terms of service.
+                </p>
+              </form>
+            )}
+
+            {/* FORGOT PASSWORD */}
+            {tab === 'forgot' && (
+              <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 18, color: t.text, marginBottom: 6 }}>Reset your password</div>
+                  <div style={{ fontSize: 13, color: t.textSecondary, lineHeight: 1.55 }}>
+                    Enter your email and we'll send you a link to reset your password.
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.textSecondary, display: 'block', marginBottom: 5 }}>Email</label>
+                  <EmailField />
+                </div>
+
+                {error   && <div style={{ fontSize: 12, color: t.red, padding: '8px 12px', borderRadius: 8, background: t.redLight, border: `1px solid ${t.red}30` }}>{error}</div>}
+                {success && <div style={{ fontSize: 12, color: t.green, padding: '8px 12px', borderRadius: 8, background: t.greenLight, border: `1px solid ${t.green}30` }}>{success}</div>}
+
+                <button type="submit" disabled={loading} style={btnStyle(loading)}>
+                  {loading
+                    ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${t.textTertiary}`, borderTopColor: t.accentText, animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                        Sending...
+                      </span>
+                    : 'Send reset link'
+                  }
+                </button>
+
+                <button type="button" onClick={() => clearState('signin')} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 13, color: t.textSecondary, padding: '4px 0',
+                }}>
+                  ← Back to sign in
+                </button>
+              </form>
+            )}
+          </div>
         </div>
 
-        {/* Features */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 24, justifyContent: 'center', flexWrap: 'wrap' }}>
-          {['🔍 Skill gap analysis', '🎙 Voice interviews', '📚 Learning plans'].map(f => (
-            <div key={f} style={{
-              fontSize: 12, color: t.textSecondary,
-              padding: '5px 12px', borderRadius: 20,
-              border: `1px solid ${t.border}`, background: t.bgCard,
-            }}>{f}</div>
+        {/* Features strip */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'center', flexWrap: 'wrap' }}>
+          {['🔒 Private & secure', '🔍 Skill gap analysis', '📚 Learning plans'].map(f => (
+            <div key={f} style={{ fontSize: 12, color: t.textSecondary, padding: '5px 12px', borderRadius: 20, border: `1px solid ${t.border}`, background: t.bgCard }}>
+              {f}
+            </div>
           ))}
         </div>
       </div>

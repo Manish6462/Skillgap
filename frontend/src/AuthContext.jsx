@@ -21,22 +21,20 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithGitHub = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'github',
-      options: {
-        redirectTo: window.location.origin,
-        scopes: 'read:user user:email',
-      }
-    });
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
+  // Email auth — used directly in LoginPage via supabase client
+  // Kept here for convenience if needed elsewhere
+  const signInWithEmail = (email, password) =>
+    supabase.auth.signInWithPassword({ email, password });
+
+  const signUpWithEmail = (email, password) =>
+    supabase.auth.signUp({ email, password });
+
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGitHub, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signOut, signInWithEmail, signUpWithEmail }}>
       {children}
     </AuthContext.Provider>
   );
